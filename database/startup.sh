@@ -4,7 +4,10 @@
 DB_NAME="myapp"
 DB_USER="appuser"
 DB_PASSWORD="dbuser123"
-DB_PORT="5000"
+
+# Port expected by the platform/orchestrator for this database container.
+# Keeping this in one place ensures db_connection.txt and viewer env stay consistent.
+DB_PORT="5001"
 
 echo "Starting PostgreSQL setup..."
 
@@ -21,14 +24,24 @@ if sudo -u postgres ${PG_BIN}/pg_isready -p ${DB_PORT} > /dev/null 2>&1; then
     echo "User: ${DB_USER}"
     echo "Port: ${DB_PORT}"
     echo ""
+
+    # Always (re)write connection info so dependent containers/tools can rely on it.
+    echo "psql postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" > db_connection.txt
+    echo "Connection string saved to db_connection.txt"
+
+    # Keep db_visualizer env in sync as well.
+    cat > db_visualizer/postgres.env << EOF
+export POSTGRES_URL="postgresql://localhost:${DB_PORT}/${DB_NAME}"
+export POSTGRES_USER="${DB_USER}"
+export POSTGRES_PASSWORD="${DB_PASSWORD}"
+export POSTGRES_DB="${DB_NAME}"
+export POSTGRES_PORT="${DB_PORT}"
+EOF
+
+    echo "Environment variables saved to db_visualizer/postgres.env"
     echo "To connect to the database, use:"
     echo "psql -h localhost -U ${DB_USER} -d ${DB_NAME} -p ${DB_PORT}"
-    
-    # Check if connection info file exists
-    if [ -f "db_connection.txt" ]; then
-        echo "Or use: $(cat db_connection.txt)"
-    fi
-    
+    echo "$(cat db_connection.txt)"
     echo ""
     echo "Script stopped - server already running."
     exit 0
